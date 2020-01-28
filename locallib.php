@@ -644,96 +644,6 @@ function mod_studentquiz_get_comments_with_creators($questionid) {
     return $DB->get_records_sql($sql, array( 'questionid' => $questionid));
 }
 
-
-/**
- * Generate some HTML to render comments
- *
- * @param array $comments from studentquiz_coments ordered by comment->created ASC
- * @param int $userid, viewing user id
- * @param int $cmid, course module id
- * @param bool $anonymize Display or hide other author names
- * @param bool $ismoderator True renders edit buttons to all comments false, only those for createdby userid
- * @return string HTML fragment
- * TODO: Render function should move to renderers!
- */
-function mod_studentquiz_comment_renderer($comments, $userid, $cmid, $anonymize, $ismoderator) {
-
-    $output = '';
-
-    $modname = 'studentquiz';
-
-    if (empty($comments)) {
-        return html_writer::div(get_string('no_comments', $modname));
-    }
-
-    $authorids = array();
-    $authors = array();
-
-    // Collect distinct anonymous author ids chronologically.
-    foreach ($comments as $comment) {
-        if (!in_array($comment->userid, $authorids)) {
-            $authorids[] = $comment->userid;
-            $authors[] = user_get_users_by_id(array($comment->userid))[$comment->userid];
-        }
-    }
-
-    $num = 0;
-    $showmoreafter = 10;
-    // Output comments in chronically reverse order.
-    foreach (array_reverse($comments) as $comment) {
-        $isfromcreator = $comment->userid == $userid;
-        $canedit = $ismoderator || $isfromcreator;
-        $seename = !$anonymize || $isfromcreator;
-
-        $date = userdate($comment->created, get_string('strftimedatetime', 'langconfig'));
-
-        if ($seename) {
-            $username = fullname($authors[array_search($comment->userid, $authorids)]);
-        } else {
-            $username = get_string('creator_anonym_fullname', 'studentquiz')
-                . ' #' . (1 + array_search($comment->userid, $authorids));
-        }
-
-        $editspan = '';
-        if ($canedit) {
-            $editspan = html_writer::span(get_string('remove_comment', 'studentquiz'), 'remove_action',
-                    [
-                            'data-id' => $comment->id,
-                            'data-question_id' => $comment->questionid,
-                            'tabindex' => '0',
-                            'aria-label' => get_string('remove_comment_label', 'studentquiz')
-                    ]
-            );
-        }
-
-        $output .= html_writer::div( $editspan
-            . html_writer::tag('p', $date . ' | ' . $username)
-            . format_text(
-                $comment->comment,
-                FORMAT_MOODLE,
-                array('context' => context_module::instance($cmid))
-            ),
-            (($num >= $showmoreafter) ? 'hidden' : '')
-            . (($isfromcreator) ? 'fromcreator' : '')
-        );
-        $num++;
-    }
-
-    if (count($comments) > $showmoreafter) {
-        $output .= html_writer::div(
-            html_writer::tag('button', get_string('show_more', $modname),
-                array('type' => 'button', 'class' => 'show_more btn btn-secondary')
-            )
-            . html_writer::tag('button', get_string('show_less', $modname)
-                , array('type' => 'button', 'class' => 'show_less btn btn-secondary hidden')
-            )
-            , 'button_controls'
-        );
-    }
-
-    return $output;
-}
-
 /**
  * Get Paginated ranking data ordered (DESC) by points, questions_created, questions_approved, rates_average
  * @param int $cmid Course module id of the StudentQuiz considered.
@@ -1037,21 +947,66 @@ function mod_studentquiz_get_roles() {
 function mod_studentquiz_ensure_question_capabilities($context) {
     global $CFG;
 
-    $neededcapabilities = array(
-        'moodle/question:add',
-        'moodle/question:usemine',
-        'moodle/question:viewmine',
-        'moodle/question:editmine'
-    );
+    $neededcapabilities = [
+            'mod/studentquiz:view' => [
+                    'moodle/question:useall'
+            ],
+            'mod/studentquiz:submit' => [
+                    'moodle/question:add',
+                    'moodle/question:viewmine',
+                    'moodle/question:editmine'
+            ],
+            'mod/studentquiz:previewothers' => [
+                    'moodle/question:viewall',
+                    'moodle/question:editall'
+            ],
+            'mod/studentquiz:manage' => [
+                    'moodle/question:add',
+                    'moodle/question:viewall',
+                    'moodle/question:editall'
+            ]
+    ];
+
+    $studentquizcapabilities = array_keys($neededcapabilities);
+
+    $extracapabilities = [];
+    $capabiltiesneededbyeachrole = [];
     if ($CFG->version >= 2018051700) { // Moodle 3.5+.
-        $neededcapabilities[] = 'moodle/question:tagmine';
+        $extracapabilities[] = 'moodle/question:tagmine';
     }
 
-    // Get the ids of all the roles that can submit questions in this activity.
-    list($roleids) = get_roles_with_cap_in_context($context, 'mod/studentquiz:submit');
-    foreach ($roleids as $roleid) {
+    foreach ($studentquizcapabilities as $studentquizcapability) {
+        // Get the ids of all the roles that related to given capability.
+        list($roleids) = get_roles_with_cap_in_context($context, $studentquizcapability);
+        foreach ($roleids as $roleid) {
+            if (!array_key_exists($roleid, $capabiltiesneededbyeachrole)) {
+                $capabiltiesneededbyeachrole[$roleid] = $neededcapabilities[$studentquizcapability];
+            } else {
+                $capabiltiesneededbyeachrole[$roleid] =
+                        array_merge($capabiltiesneededbyeachrole[$roleid], $neededcapabilities[$studentquizcapability]);
+            }
+        }
+    }
+
+    foreach ($capabiltiesneededbyeachrole as $roleid => $questioncapabilites) {
+        $capabilitieswithall  = preg_grep('/all$/', $questioncapabilites);
+        foreach ($capabilitieswithall as $capabilitiy) {
+            $capabilitieswithmine = preg_replace('/all$/', 'mine', $capabilitiy);
+            if (in_array($capabilitieswithmine, $questioncapabilites)) {
+                // Remove the 'mine' if we have 'all' capability.
+                $deletekey = array_search($capabilitieswithmine, $capabiltiesneededbyeachrole[$roleid]);
+                unset($capabiltiesneededbyeachrole[$roleid][$deletekey]);
+            }
+        }
+    }
+
+    foreach ($capabiltiesneededbyeachrole as $roleid => $questioncapabilites) {
+        // Include the extra capabilities if needed.
+        if (!empty($extracapabilities)) {
+            $questioncapabilites = array_merge($questioncapabilites, $extracapabilities);
+        }
         // If needed, add an override for each question capability.
-        foreach ($neededcapabilities as $capability) {
+        foreach ($questioncapabilites as $capability) {
             // This function only creates an override if needed.
             role_change_permission($roleid, $context, $capability, CAP_ALLOW);
         }
@@ -1443,47 +1398,6 @@ function mod_studentquiz_save_rate($data) {
     } else {
         $DB->update_record('studentquiz_rate', $row);
     }
-}
-
-/**
- * Saves question comment.
- *
- * // TODO:
- * @param  stdClass $data requires userid, questionid, comment
- * @param $course
- * @param $module
- */
-function mod_studentquiz_save_comment($data, $course, $module) {
-    global $DB;
-
-    $data->created = usertime(time(), usertimezone());
-    $DB->insert_record('studentquiz_comment', $data);
-    mod_studentquiz_notify_comment_added($data, $course, $module);
-}
-
-/**
- * Deletes question comment.
- *
- * // TODO:
- * @param  stdClass $data requires commentid
- * @param $course
- * @param $module
- * @return bool success
- */
-function mod_studentquiz_delete_comment($commentid, $course, $module) {
-    global $DB, $USER;
-
-    $success = false;
-    $comment = $DB->get_record('studentquiz_comment', array('id' => $commentid));
-    // The manager is allowed to delete any comment and additionally sends a notification.
-    if (mod_studentquiz_check_created_permission($module->id)) {
-        $success = $DB->delete_records('studentquiz_comment', array('id' => $commentid));
-        mod_studentquiz_notify_comment_deleted($comment, $course, $module);
-    } else {
-        // Only the student can delete his own comment.
-        $success = $DB->delete_records('studentquiz_comment', array('id' => $commentid, 'userid' => $USER->id));
-    }
-    return $success;
 }
 
 /**
