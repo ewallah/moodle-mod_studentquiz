@@ -24,7 +24,7 @@ Feature: View comprehensive information about this studentquiz activity
       | Default for StudentQuiz 1 | essay | Test question to be copied | Write about whatever you want |
     And I log in as "student1"
 
-  @javascript
+  @javascript @_switch_window
   Scenario: Check if the default filter settings are visible
     When I am on "Course 1" course homepage
     And I follow "StudentQuiz 1"
