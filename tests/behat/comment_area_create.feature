@@ -33,7 +33,7 @@ Feature: Create comment as an user
       | Default for StudentQuiz 1 | truefalse | Test question to be previewed | Answer the question 1 |
       | Default for StudentQuiz 2 | truefalse | Test question to be previewed | Answer the question 2 |
 
-  @javascript
+  @javascript @_switch_window
   Scenario: Test show initital view and Expand all comment/ Collapse all comment button. Check both start quiz and preview mode
     Given I log in as "admin"
     And I am on "Course 1" course homepage
@@ -294,7 +294,7 @@ Feature: Create comment as an user
 
   @javascript
   Scenario: Admin and user can sortable.
-     # Student 2
+    # Student 2
     Given I log in as "student2"
     And I am on "Course 1" course homepage
     And I follow "StudentQuiz 1"
@@ -306,7 +306,7 @@ Feature: Create comment as an user
     And I press "Add comment"
     And I wait until the page is ready
     And I log out
-     # Student 3
+    # Student 3
     Given I log in as "student3"
     And I am on "Course 1" course homepage
     And I follow "StudentQuiz 1"
@@ -318,7 +318,7 @@ Feature: Create comment as an user
     And I press "Add comment"
     And I wait until the page is ready
     And I log out
-     # Student 4
+    # Student 4
     Given I log in as "student4"
     And I am on "Course 1" course homepage
     And I follow "StudentQuiz 1"
@@ -330,7 +330,7 @@ Feature: Create comment as an user
     And I press "Add comment"
     And I wait until the page is ready
     And I log out
-     # Student 5
+    # Student 5
     Given I log in as "student5"
     And I am on "Course 1" course homepage
     And I follow "StudentQuiz 1"
@@ -342,7 +342,7 @@ Feature: Create comment as an user
     And I press "Add comment"
     And I wait until the page is ready
     And I log out
-     # Log in as admin
+    # Log in as admin
     Given I log in as "admin"
     And I am on "Course 1" course homepage
     And I follow "StudentQuiz 1"
@@ -421,3 +421,26 @@ Feature: Create comment as an user
     Then I should see "Date" in the ".studentquiz-comment-filters" "css_element"
     And I should not see "Forename" in the ".studentquiz-comment-filters" "css_element"
     And I should not see "Surname" in the ".studentquiz-comment-filters" "css_element"
+
+  @javascript
+  Scenario: Test placeholder display after click Add comment.
+    Given I log in as "admin"
+    And I am on "Course 1" course homepage
+    And I follow "StudentQuiz 1"
+    When I click on "Start Quiz" "button"
+    And I set the field "True" to "1"
+    And I press "Check"
+    # Wait for comment area init.
+    When I wait until the page is ready
+    # Check if placeholder has correct text.
+    Then the "data-placeholder" attribute of ".editor_atto_content_wrap" "css_element" should contain "Enter your comment here ..."
+    # Enter "Comment 1".
+    When I enter the text "Comment 1" into the "Add comment" editor
+    # Check data-placeholder now is empty.
+    Then ".editor_atto_content_wrap[data-placeholder='']" "css_element" should exist
+    And I press "Add comment"
+    And I wait until the page is ready
+    When I wait until ".studentquiz-comment-item:nth-child(1)" "css_element" exists
+    Then I should see "Comment 1" in the ".studentquiz-comment-item:nth-child(1) .studentquiz-comment-text" "css_element"
+    # Check placeholder is back with correct text.
+    And the "data-placeholder" attribute of ".editor_atto_content_wrap" "css_element" should contain "Enter your comment here ..."

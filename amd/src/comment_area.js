@@ -49,6 +49,10 @@ define(['jquery', 'core/str', 'core/ajax', 'core/modal_factory', 'core/templates
             ACTION_SHOW_ERROR: 'action_show_error',
             FRAGMENT_FORM_CALLBACK: 'commentform',
             HAS_COMMENT_CLASS: 'has-comment',
+            ATTO_CONTENT_TYPE: {
+                HAS_CONTENT: 'has-content',
+                NO_CONTENT: 'no-content'
+            },
             SELECTOR: {
                 CONTAINER: '.studentquiz-comment-container',
                 EXPAND_ALL: '.studentquiz-comment-expand',
@@ -144,11 +148,11 @@ define(['jquery', 'core/str', 'core/ajax', 'core/modal_factory', 'core/templates
                         self.loadingIcon = el.find(t.SELECTOR.LOADING_ICON);
                         self.formSelector = el.find(t.SELECTOR.FORM_SELECTOR);
 
-                        self.questionId = parseInt(params.questionid);
-                        self.contextId = parseInt(params.contextid);
-                        self.userId = parseInt(params.userid);
-                        self.numberToShow = parseInt(params.numbertoshow);
-                        self.cmId = parseInt(params.cmid);
+                        self.questionId = parseInt(el.data('questionid'));
+                        self.contextId = parseInt(el.data('contextid'));
+                        self.userId = parseInt(el.data('userid'));
+                        self.numberToShow = parseInt(el.data('numbertoshow'));
+                        self.cmId = parseInt(el.data('cmid'));
 
                         self.countServerData = {
                             count: params.count,
@@ -156,12 +160,12 @@ define(['jquery', 'core/str', 'core/ajax', 'core/modal_factory', 'core/templates
                         };
 
                         self.expand = params.expand || false;
-                        self.referer = params.referer;
+                        self.referer = el.data('referer');
                         self.sortFeature = params.sortfeature;
-                        self.sortable = params.sortable;
+                        self.sortable = el.data('sortable');
 
-                        // Get all language string.
-                        self.string = params.strings;
+                        // Get all language strings.
+                        self.string = el.data('strings');
                         self.forceCommenting = params.forcecommenting;
                         self.canViewDeleted = params.canviewdeleted;
                         self.isNoComment = params.isnocomment;
@@ -348,6 +352,7 @@ define(['jquery', 'core/str', 'core/ajax', 'core/modal_factory', 'core/templates
                                     formSelector.trigger('reset');
                                     // Clear atto editor data.
                                     formSelector.find('#id_editor_question_' + unique + 'editable').empty();
+                                    formSelector.find(t.SELECTOR.TEXTAREA).trigger('change');
                                     M.util.js_complete(t.ACTION_CLEAR_FORM);
                                 });
                                 var data = self.convertForTemplate(response, true);
@@ -1421,6 +1426,8 @@ define(['jquery', 'core/str', 'core/ajax', 'core/modal_factory', 'core/templates
                         submitBtn.removeClass('disabled');
                         submitBtn.prop('disabled', false);
                         editorContentWrap.attr('data-placeholder', '');
+                        editorContentWrap.addClass(t.ATTO_CONTENT_TYPE.HAS_CONTENT);
+                        editorContentWrap.removeClass(t.ATTO_CONTENT_TYPE.NO_CONTENT);
                     },
 
                     /**
@@ -1435,6 +1442,8 @@ define(['jquery', 'core/str', 'core/ajax', 'core/modal_factory', 'core/templates
                         submitBtn.addClass('disabled');
                         submitBtn.prop('disabled', true);
                         editorContentWrap.attr('data-placeholder', placeholder);
+                        editorContentWrap.addClass(t.ATTO_CONTENT_TYPE.NO_CONTENT);
+                        editorContentWrap.removeClass(t.ATTO_CONTENT_TYPE.HAS_CONTENT);
                     },
 
                     /**
@@ -1451,7 +1460,7 @@ define(['jquery', 'core/str', 'core/ajax', 'core/modal_factory', 'core/templates
                 };
             },
             generate: function(params) {
-                t.get().init(JSON.parse(params));
+                t.get().init(params);
             }
         };
         return t;
